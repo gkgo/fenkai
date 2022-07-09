@@ -137,7 +137,7 @@ def parse_args(arg_mode):
     parser.add_argument('-data_dir', type=str, default='datasets', help='dir of datasets')
 
     ''' about training specs '''
-    parser.add_argument('-batch', type=int, default=128, help='auxiliary batch size')
+    parser.add_argument('-batch', type=int, default=64, help='auxiliary batch size')
     parser.add_argument('-temperature', type=float, default=0.2, metavar='tau', help='temperature for metric-based loss')
     parser.add_argument('-lamb', type=float, default=0.25, metavar='lambda', help='loss balancing term')
 
@@ -151,7 +151,7 @@ def parse_args(arg_mode):
     ''' about few-shot episodes '''
     parser.add_argument('-way', type=int, default=5, metavar='N', help='number of few-shot classes')
     parser.add_argument('-shot', type=int, default=1, metavar='K', help='number of shots')
-    parser.add_argument('-query', type=int, default=15, help='number of query image per class')
+    parser.add_argument('-query', type=int, default=2, help='number of query image per class')
     parser.add_argument('-val_episode', type=int, default=200, help='number of validation episode')
     parser.add_argument('-test_episode', type=int, default=2000, help='number of testing episodes after training')
 
