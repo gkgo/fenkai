@@ -6,6 +6,7 @@ import torch.nn.functional as F
 from models.resnet import ResNet
 from models.cca import *
 from models.scr import  SelfCorrelationComputation,SCR
+import numpy as np
 # from models.others.se import SqueezeExcitation
 # from models.others.lsa import LocalSelfAttention
 # from models.others.nlsa import NonLocalSelfAttention
