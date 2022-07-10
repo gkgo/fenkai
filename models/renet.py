@@ -5,7 +5,7 @@ import torch.nn.functional as F
 
 from models.resnet import ResNet
 from models.cca import *
-from models.scr import  SelfCorrelationComputation1
+from models.scr import  *
 import numpy as np
 # from models.others.se import SqueezeExcitation
 # from models.others.lsa import LocalSelfAttention
@@ -39,30 +39,19 @@ class RENet(nn.Module):
 
 
     def _make_scr_layer(self, planes):
-        # stride, kernel_size, padding = (1, 1, 1), (5, 5), 2
+        stride, kernel_size, padding = (1, 1, 1), (5, 5), 2
         layers = list()
 
         if self.args.self_method == 'scr':
             corr_block1 = SelfCorrelationComputation1(d_model=640, h=1)
-            # corr_block = SelfCorrelationComputation(kernel_size=kernel_size, padding=padding)
-            # kernel_size=5,dim=640,num_heads=1
-            # corr_block = SelfCorrelationComputation(kernel_size=3, dim=640, num_heads=1)
-            # self_block = SCR(planes=planes, stride=stride)
-        # elif self.args.self_method == 'sce':
-        #     planes = [640, 64, 64, 640]
-        #     self_block = SpatialContextEncoder(planes=planes, kernel_size=kernel_size[0])
-        # elif self.args.self_method == 'se':
-        #     self_block = SqueezeExcitation(channel=planes[0])
-        # elif self.args.self_method == 'lsa':
-        #     self_block = LocalSelfAttention(in_channels=planes[0], out_channels=planes[0], kernel_size=kernel_size[0])
-        # elif self.args.self_method == 'nlsa':
-        #     self_block = NonLocalSelfAttention(planes[0], sub_sample=False)
+            corr_block = SelfCorrelationComputation(kernel_size=kernel_size, padding=padding)
+            self_block = SCR(planes=planes, stride=stride)
         else:
             raise NotImplementedError
 
         if self.args.self_method == 'scr':
             layers.append(corr_block1)
-        # layers.append(self_block)
+        layers.append(self_block)
         return nn.Sequential(*layers)
 
     def forward(self, input):
