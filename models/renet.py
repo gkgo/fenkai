@@ -86,23 +86,10 @@ class RENet(nn.Module):
         spt = self.normalize_feature(spt)  # 1
         qry = self.normalize_feature(qry)
 
-        # batch1 = []  # 查询
-        # batch2 = []  # 支持
-        # qry_1, qry_2,qry_3, qry_4,qry_5, qry_6,qry_7, qry_8,qry_9, qry_10,qry_11, qry_12 ,qry_13, qry_14,qry_15= torch.chunk(qry, 15, dim=0)
-        # ch = [qry_1, qry_2,qry_3, qry_4,qry_5, qry_6,qry_7, qry_8,qry_9, qry_10,qry_11, qry_12 ,qry_13, qry_14,qry_15]
-        # for d in zip(ch):
-        #     cx = d
-        #     cx = torch.tensor(np.array([item.cpu().detach().numpy() for item in cx])).cuda()
-        #     cx = cx.squeeze(0)
-        #     act_det, act_aim = self.match_net(spt, cx)
-        #     batch1.append(act_det)
-        #     batch2.append(act_aim)
-        # cos = []
-
         batch1 = []  # 查询
         batch2 = []  # 支持
-        qry_1, qry_2 = torch.chunk(qry, 2, dim=0)
-        ch = [qry_1, qry_2]
+        qry_1, qry_2,qry_3, qry_4,qry_5, qry_6,qry_7, qry_8,qry_9, qry_10,qry_11, qry_12 ,qry_13, qry_14,qry_15= torch.chunk(qry, 15, dim=0)
+        ch = [qry_1, qry_2,qry_3, qry_4,qry_5, qry_6,qry_7, qry_8,qry_9, qry_10,qry_11, qry_12 ,qry_13, qry_14,qry_15]
         for d in zip(ch):
             cx = d
             cx = torch.tensor(np.array([item.cpu().detach().numpy() for item in cx])).cuda()
@@ -112,14 +99,18 @@ class RENet(nn.Module):
             batch2.append(act_aim)
         cos = []
 
-        qry_1, qry_2 = torch.chunk(qry, 2, dim=0)
-        ch = [qry_1, qry_2]
-        act_det1, act_aim1 = self.match_net(spt, qry_1)
-        act_det2, act_aim2 = self.match_net(spt, qry_2)
-        batch1 = [act_det1,act_det2]  # 查询
-        batch2 = [act_aim1,act_aim2]  # 支持
-        cos = []
-
+#         batch1 = []  # 查询
+#         batch2 = []  # 支持
+#         qry_1, qry_2 = torch.chunk(qry, 2, dim=0)
+#         ch = [qry_1, qry_2]
+#         for d in zip(ch):
+#             cx = d
+#             cx = torch.tensor(np.array([item.cpu().detach().numpy() for item in cx])).cuda()
+#             cx = cx.squeeze(0)
+#             act_det, act_aim = self.match_net(spt, cx)
+#             batch1.append(act_det)
+#             batch2.append(act_aim)
+#         cos = []
 
 
         # act_det = self.lin(act_det)
