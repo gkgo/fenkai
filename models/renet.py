@@ -4,8 +4,9 @@ import torch.nn.functional as F
 
 
 from models.resnet import ResNet
-from models.cca import *
-from models.scr import  SelfCorrelationComputation,SCR
+from models.cca import CCA
+from models.scr import  SelfCorrelationComputation1
+from models.ch import *
 import numpy as np
 # from models.others.se import SqueezeExcitation
 # from models.others.lsa import LocalSelfAttention
@@ -39,15 +40,15 @@ class RENet(nn.Module):
 
 
     def _make_scr_layer(self, planes):
-        stride, kernel_size, padding = (1, 1, 1), (5, 5), 2
+        # stride, kernel_size, padding = (1, 1, 1), (5, 5), 2
         layers = list()
 
         if self.args.self_method == 'scr':
-            corr_block = SelfCorrelationComputation(kernel_size=kernel_size, padding=padding)
+            corr_block1 = SelfCorrelationComputation1(d_model=640, h=1)
+            # corr_block = SelfCorrelationComputation(kernel_size=kernel_size, padding=padding)
             # kernel_size=5,dim=640,num_heads=1
             # corr_block = SelfCorrelationComputation(kernel_size=3, dim=640, num_heads=1)
-            # corr_block = SelfCorrelationComputation(channel=640)
-            self_block = SCR(planes=planes, stride=stride)
+            # self_block = SCR(planes=planes, stride=stride)
         # elif self.args.self_method == 'sce':
         #     planes = [640, 64, 64, 640]
         #     self_block = SpatialContextEncoder(planes=planes, kernel_size=kernel_size[0])
@@ -61,8 +62,8 @@ class RENet(nn.Module):
             raise NotImplementedError
 
         if self.args.self_method == 'scr':
-            layers.append(corr_block)
-        layers.append(self_block)
+            layers.append(corr_block1)
+        # layers.append(self_block)
         return nn.Sequential(*layers)
 
     def forward(self, input):
@@ -86,10 +87,23 @@ class RENet(nn.Module):
 
         spt = self.normalize_feature(spt)  # 1
         qry = self.normalize_feature(qry)
+
+        # batch1 = []  # 查询
+        # batch2 = []  # 支持
+        # qry_1, qry_2,qry_3, qry_4,qry_5, qry_6,qry_7, qry_8,qry_9, qry_10,qry_11, qry_12 ,qry_13, qry_14,qry_15= torch.chunk(qry, 15, dim=0)
+        # ch = [qry_1, qry_2,qry_3, qry_4,qry_5, qry_6,qry_7, qry_8,qry_9, qry_10,qry_11, qry_12 ,qry_13, qry_14,qry_15]
+        # for d in zip(ch):
+        #     cx = d
+        #     cx = torch.tensor(np.array([item.cpu().detach().numpy() for item in cx])).cuda()
+        #     cx = cx.squeeze(0)
+        #     act_det, act_aim = self.match_net(spt, cx)
+        #     batch1.append(act_det)
+        #     batch2.append(act_aim)
+        # cos = []
         batch1 = []  # 查询
         batch2 = []  # 支持
-        qry_1, qry_2,qry_3, qry_4,qry_5, qry_6,qry_7, qry_8,qry_9, qry_10,qry_11, qry_12 ,qry_13, qry_14,qry_15= torch.chunk(qry, 15, dim=0)
-        ch = [qry_1, qry_2,qry_3, qry_4,qry_5, qry_6,qry_7, qry_8,qry_9, qry_10,qry_11, qry_12 ,qry_13, qry_14,qry_15]
+        qry_1, qry_2 = torch.chunk(qry, 2, dim=0)
+        ch = [qry_1, qry_2]
         for d in zip(ch):
             cx = d
             cx = torch.tensor(np.array([item.cpu().detach().numpy() for item in cx])).cuda()
@@ -99,11 +113,16 @@ class RENet(nn.Module):
             batch2.append(act_aim)
         cos = []
 
+        # qry_1, qry_2 = torch.chunk(qry, 2, dim=0)
+        # ch = [qry_1, qry_2]
+        # act_det1, act_aim1 = self.match_net(spt, qry_1)
+        # act_det2, act_aim2 = self.match_net(spt, qry_2)
+        # batch1 = [act_det1,act_det2]  # 查询
+        # batch2 = [act_aim1,act_aim2]  # 支持
+        # cos = []
 
-        # act_det = torch.cat((act_det_1,act_det_2),dim=0)
 
-        # # act_aim = self._head_to_tail(act_aim)
-        # # act_det = self._head_to_tail(act_aim)
+
         # act_det = self.lin(act_det)
         # act_aim = self.lin(act_aim)
         #
