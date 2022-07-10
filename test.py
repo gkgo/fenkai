@@ -52,7 +52,7 @@ def test_main(model, args):
     Dataset = dataset_builder(args)
     test_set = Dataset('test', args)
     sampler = CategoriesSampler(test_set.label, args.test_episode, args.way, args.shot + args.query)
-    test_loader = DataLoader(test_set, batch_sampler=sampler, num_workers=8, pin_memory=True)
+    test_loader = DataLoader(test_set, batch_sampler=sampler, num_workers=2, pin_memory=True)
 
     ''' evaluate the model with the dataset '''
     _, test_acc, test_ci = evaluate("best", model, test_loader, args, set='test')
