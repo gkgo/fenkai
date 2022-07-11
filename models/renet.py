@@ -88,6 +88,7 @@ class RENet(nn.Module):
 
         batch1 = []  # 查询
         batch2 = []  # 支持
+        cos = []
         if self.args.shot > 1:
             qry_1, qry_2, qry_3 = torch.chunk(qry, 3, dim=0)
             ch = [qry_1, qry_2, qry_3]
@@ -98,7 +99,6 @@ class RENet(nn.Module):
                 act_det, act_aim = self.match_net(spt, cx)
                 batch1.append(act_det)
                 batch2.append(act_aim)
-            cos = []
         else:
             qry_1, qry_2,qry_3, qry_4,qry_5, qry_6,qry_7, qry_8,qry_9, qry_10,qry_11, qry_12 ,qry_13, qry_14,qry_15= torch.chunk(qry, 15, dim=0)
             ch = [qry_1, qry_2,qry_3, qry_4,qry_5, qry_6,qry_7, qry_8,qry_9, qry_10,qry_11, qry_12 ,qry_13, qry_14,qry_15]
@@ -109,7 +109,6 @@ class RENet(nn.Module):
                 act_det, act_aim = self.match_net(spt, cx)
                 batch1.append(act_det)
                 batch2.append(act_aim)
-            cos = []
 
 #         batch1 = []  # 查询
 #         batch2 = []  # 支持
