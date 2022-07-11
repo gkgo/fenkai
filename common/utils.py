@@ -132,7 +132,7 @@ def parse_args(arg_mode):
     parser = argparse.ArgumentParser(description='Relational Embedding for Few-Shot Classification (ICCV 2021)')
 
     ''' about dataset '''
-    parser.add_argument('-dataset', type=str, default='cifar_fs',
+    parser.add_argument('-dataset', type=str, default='cub',
                         choices=['miniimagenet', 'cub', 'tieredimagenet', 'cifar_fs'])
     parser.add_argument('-data_dir', type=str, default='datasets', help='dir of datasets')
 
