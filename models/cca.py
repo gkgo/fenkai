@@ -133,13 +133,13 @@ class match_block(nn.Module):
         non_aim = non_aim.permute(0,2,1).contiguous()
         non_aim = non_aim.view(bs, self.inter_channels, height_a, width_a)
         non_aim = self.W(non_aim)
-        non_aim = non_aim + spt  # (5,640,5,5) # 支持集
+
 
         non_det = torch.matmul(fi_div_C, a_x)
         non_det = non_det.permute(0,2,1).contiguous()
         non_det = non_det.view(bq, self.inter_channels, height_d, width_d)
         non_det = self.Q(non_det)
-        non_det = non_det + qry  # (5,640,5,5)
+
 
         ##################################### Response in chaneel weight ####################################################
 
