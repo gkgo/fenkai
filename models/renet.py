@@ -43,7 +43,7 @@ class RENet(nn.Module):
         layers = list()
 
         if self.args.self_method == 'scr':
-            corr_block1 = SelfCorrelationComputation1(d_model=640, h=1)
+#             corr_block1 = SelfCorrelationComputation1(d_model=640, h=1)
             corr_block = SelfCorrelationComputation(kernel_size=kernel_size, padding=padding)
             self_block = SCR(planes=planes, stride=stride)
         # elif self.args.self_method == 'sce':
@@ -59,7 +59,7 @@ class RENet(nn.Module):
             raise NotImplementedError
 
         if self.args.self_method == 'scr':
-            layers.append(corr_block1)
+#             layers.append(corr_block1)
             layers.append(corr_block)
         layers.append(self_block)
         return nn.Sequential(*layers)
