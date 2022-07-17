@@ -144,12 +144,11 @@ class match_block(nn.Module):
         ##################################### Response in chaneel weight ####################################################
 
         c_weight = self.ChannelGate(non_aim)  # (5,640,1,1)
-        act_aim = non_aim * c_weight  # 支持  (5,640,5,5)
-        act_det = non_det * c_weight  # 查询  (5,640,5,5)
-        # act_aim = act_aim.view(bs, -1, height_a * width_a)
-        # act_det = act_det.view(bq, -1, height_d * width_d)
+        act_aim = non_aim * c_weight+spt  # 支持  (5,640,5,5)
+        act_det = non_det * c_weight+qry  # 查询  (5,640,5,5)
+        x = (act_aim + act_det)/2
 
-        return act_det, act_aim
+        return x
 
 class CCA(torch.nn.Module):
     def __init__(self, kernel_sizes=[3, 3], planes=[16, 1]):
