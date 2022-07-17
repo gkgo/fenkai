@@ -73,13 +73,11 @@ class match_block(nn.Module):
             bn(self.in_channels)
         )
 
-
         self.Q = nn.Sequential(
             conv_nd(in_channels=self.inter_channels, out_channels=self.in_channels,
                     kernel_size=1, stride=1, padding=0),
             bn(self.in_channels)
         )
-
 
         self.theta = conv_nd(in_channels=self.in_channels, out_channels=self.inter_channels,
                              kernel_size=1, stride=1, padding=0)
@@ -112,15 +110,8 @@ class match_block(nn.Module):
 
         phi_x = self.phi(qry).view(bq, self.inter_channels, -1)  # dect b,c,h*w # 10(5,25,320)
 
-        # phi_x1,phi_x2 = torch.chunk(phi_x, 2, dim=0)
-
-        # theta_x = theta_x.unsqueeze(0).repeat(bq, 1, 1, 1)  # 在0维度上复制num_qry
-        # phi_x = phi_x.unsqueeze(1).repeat(1, bs, 1, 1)  # 在第一维度上复制way # (10,5,25,320)
-
-        # f1 = torch.matmul(theta_x, phi_x1)  # (5,25,25)
-        # f2 = torch.matmul(theta_x, phi_x2)
-        # f  = torch.cat((f1,f2),dim=0)
-        f = torch.matmul(theta_x, phi_x)  # (10,5,25,25)
+        f = torch.matmul(theta_x, phi_x)  # (5,25,25)
+        # f = torch.einsum('svc,qmc->sqvm', theta_x, phi_x)  # 5,10,25,25
 
         N = f.size(-1)  # (25)
         f_div_C = f / N  # 10(5,25,25)
@@ -129,11 +120,11 @@ class match_block(nn.Module):
         N = f.size(-1)  # (25)
         fi_div_C = f / N  # (5,25,25)
 
-        non_aim = torch.matmul(f_div_C, d_x)  # (10,5,25,25) (10,5,25,320) (10,5,25,320)
+        non_aim = torch.matmul(f_div_C, d_x)  # (5,25,25) (5,25,320) (10,5,25,320)
+        # non_aim = torch.einsum('sqvm,qmc->sqvm', theta_x, phi_x)
         non_aim = non_aim.permute(0,2,1).contiguous()
-        non_aim = non_aim.view(bs, self.inter_channels, height_a, width_a)
+        non_aim = non_aim.view(bs, self.inter_channels, height_a, width_a)  # (5,320,5,5)
         non_aim = self.W(non_aim)
-
 
         non_det = torch.matmul(fi_div_C, a_x)
         non_det = non_det.permute(0,2,1).contiguous()
@@ -146,8 +137,9 @@ class match_block(nn.Module):
         c_weight = self.ChannelGate(non_aim)  # (5,640,1,1)
         act_aim = non_aim * c_weight+spt  # 支持  (5,640,5,5)
         act_det = non_det * c_weight+qry  # 查询  (5,640,5,5)
-        x = (act_aim + act_det)/2
-
+        # act_aim = act_aim.view(bs, -1, height_a * width_a)
+        # act_det = act_det.view(bq, -1, height_d * width_d)
+        x = (act_aim+act_det)/2
         return x
 
 class CCA(torch.nn.Module):
