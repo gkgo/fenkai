@@ -19,8 +19,8 @@ def evaluate(epoch, model, loader, args=None, set='val'):
     loss_meter = Meter()
     acc_meter = Meter()
 
-    label1 = torch.arange(args.way).repeat(args.query).cuda()
-    label = label1.flip(dims=[0])
+    label = torch.arange(args.way).repeat(args.query).cuda()
+#     label = label1.flip(dims=[0])
 
     k = args.way * args.shot
     tqdm_gen = tqdm.tqdm(loader)
