@@ -39,13 +39,13 @@ class RENet(nn.Module):
 
 
     def _make_scr_layer(self, planes):
-        stride, kernel_size, padding = (1, 1, 1), (5, 5), 2
+#         stride, kernel_size, padding = (1, 1, 1), (5, 5), 2
         layers = list()
 
         if self.args.self_method == 'scr':
-#             corr_block1 = SelfCorrelationComputation1(d_model=640, h=1)
-            corr_block = SelfCorrelationComputation(kernel_size=kernel_size, padding=padding)
-            self_block = SCR(planes=planes, stride=stride)
+            corr_block1 = SelfCorrelationComputation1(d_model=640, h=1)
+#             corr_block = SelfCorrelationComputation(kernel_size=kernel_size, padding=padding)
+#             self_block = SCR(planes=planes, stride=stride)
         # elif self.args.self_method == 'sce':
         #     planes = [640, 64, 64, 640]
         #     self_block = SpatialContextEncoder(planes=planes, kernel_size=kernel_size[0])
@@ -59,9 +59,9 @@ class RENet(nn.Module):
             raise NotImplementedError
 
         if self.args.self_method == 'scr':
-#             layers.append(corr_block1)
-            layers.append(corr_block)
-        layers.append(self_block)
+            layers.append(corr_block1)
+#             layers.append(corr_block)
+#         layers.append(self_block)
         return nn.Sequential(*layers)
 
     def forward(self, input):
