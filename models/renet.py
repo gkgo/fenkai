@@ -39,13 +39,13 @@ class RENet(nn.Module):
 
 
     def _make_scr_layer(self, planes):
-#         stride, kernel_size, padding = (1, 1, 1), (5, 5), 2
+        # stride, kernel_size, padding = (1, 1, 1), (5, 5), 2
         layers = list()
 
         if self.args.self_method == 'scr':
             corr_block1 = SelfCorrelationComputation1(d_model=640, h=1)
-#             corr_block = SelfCorrelationComputation(kernel_size=kernel_size, padding=padding)
-#             self_block = SCR(planes=planes, stride=stride)
+            # corr_block = SelfCorrelationComputation(kernel_size=kernel_size, padding=padding)
+            # self_block = SCR(planes=planes, stride=stride)
         # elif self.args.self_method == 'sce':
         #     planes = [640, 64, 64, 640]
         #     self_block = SpatialContextEncoder(planes=planes, kernel_size=kernel_size[0])
@@ -60,8 +60,8 @@ class RENet(nn.Module):
 
         if self.args.self_method == 'scr':
             layers.append(corr_block1)
-#             layers.append(corr_block)
-#         layers.append(self_block)
+        #     layers.append(corr_block)
+        # layers.append(self_block)
         return nn.Sequential(*layers)
 
     def forward(self, input):
@@ -204,10 +204,6 @@ class RENet(nn.Module):
 
 # -----------------------------------------------------------------------
 
-        # shifting channel activations by the channel mean
-        # spt = spt.squeeze(0)
-        # spt = self.normalize_feature(spt)
-        # qry = self.normalize_feature(qry)  # 5,640,5,5
 
         # (S * C * Hs * Ws, Q * C * Hq * Wq) -> Q * S * Hs * Ws * Hq * Wq
         # for x,y,i in zip(batch1,batch2,ch):  # 查询 支持
@@ -260,7 +256,7 @@ class RENet(nn.Module):
         #     cos.append(similarity_matrix)
         #
         # similarity_matrix = torch.cat((cos),dim=0)
-        # 再平均（对应公式4里的1/h*w）（75，5，640）
+        # # 再平均（对应公式4里的1/h*w）（75，5，640）
         # qry_pooled = qry.mean(dim=[-1, -2])
         if self.training:
             return similarity_matrix / self.args.temperature, self.fc(qry_pooled)
@@ -314,9 +310,9 @@ class RENet(nn.Module):
             identity = x  # (80,640,5,5)
             x = self.scr_module(x)
             x = self.match_net(identity, x)
-
-#             if self.args.self_method == 'scr':
-#                 x = x + identity   # 公式（2）
+            # 
+            # if self.args.self_method == 'scr':
+            #     x = x + identity   # 公式（2）
             x = F.relu(x, inplace=True)
 
         if do_gap:
