@@ -5,9 +5,7 @@ import wandb
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
 from torch.utils.data import DataLoader
-
 from common.meter import Meter
 from common.utils import detect_grad_nan, compute_accuracy, set_seed, setup_run
 from models.dataloader.samplers import CategoriesSampler
@@ -24,7 +22,7 @@ def train(epoch, model, loader, optimizer, args=None):
 
     # label for query set, always in the same pattern
     label = torch.arange(args.way).repeat(args.query).cuda()  # 012340123401234...
-#     label = label1.flip(dims=[0])
+    # label = label1.flip(dims=[0])
 
     loss_meter = Meter()
     acc_meter = Meter()
@@ -48,6 +46,7 @@ def train(epoch, model, loader, optimizer, args=None):
         logits, absolute_logits = model((data_shot.unsqueeze(0).repeat(args.num_gpu, 1, 1, 1, 1), data_query))
         epi_loss = F.cross_entropy(logits, label)
         absolute_loss = F.cross_entropy(absolute_logits, train_labels[k:])
+        # loss1 = F.cross_entropy(logits1, label)
 
         # loss for auxiliary batch
         model.module.mode = 'fc'
