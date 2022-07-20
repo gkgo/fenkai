@@ -93,9 +93,8 @@ class match_block1(nn.Module):
 
     def forward(self, spt, qry):
         c_weight = self.ChannelGate(spt)
-        x1 = qry*c_weight + qry
-        x2 = spt + qry
-        x = (x1+x2)/2
+        x1 = spt*c_weight 
+        x = x1 + qry
         return x
 
 class match_block(nn.Module):
