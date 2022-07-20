@@ -93,7 +93,7 @@ class RENet(nn.Module):
         num_qry, way, H_s, W_s, H_q, W_q = corr4d.size()
 
         # corr4d refinement
-        corr4d = self.cca_module(corr4d.view(-1, 1, H_s, W_s, H_q, W_q))
+#         corr4d = self.cca_module(corr4d.view(-1, 1, H_s, W_s, H_q, W_q))
         corr4d_s = corr4d.view(num_qry, way, H_s * W_s, H_q, W_q)  # 10，5，25，5，5
         corr4d_q = corr4d.view(num_qry, way, H_s, W_s, H_q * W_q)  # 10，5，5，5，25
 
@@ -113,12 +113,12 @@ class RENet(nn.Module):
 
         # applying attention
         spt_attended = attn_s.unsqueeze(2) * spt.unsqueeze(0)  # 10，5，640，5，5
-#         spt_attended = spt_attended.view(-1,640,H_s, W_s)
+        spt_attended = spt_attended.view(-1,640,H_s, W_s)
         qry_attended = attn_q.unsqueeze(2) * qry.unsqueeze(1)  # 10，5，640，5，5
-#         qry_attended = qry_attended.view(-1,640,H_q, W_q)
-#         spt_attended, qry_attended = self.match_net(spt_attended, qry_attended )
-#         spt_attended = spt_attended.view(num_qry, way,640,H_s, W_s)
-#         qry_attended = qry_attended.view(num_qry, way,640,H_q, W_q)
+        qry_attended = qry_attended.view(-1,640,H_q, W_q)
+        spt_attended, qry_attended = self.match_net(spt_attended, qry_attended )
+        spt_attended = spt_attended.view(num_qry, way,640,H_s, W_s)
+        qry_attended = qry_attended.view(num_qry, way,640,H_q, W_q)
 
         # averaging embeddings for k > 1 shots
         if self.args.shot > 1:
