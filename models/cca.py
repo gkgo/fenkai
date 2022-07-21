@@ -29,7 +29,7 @@ class ChannelAttention(nn.Module):
         out = avg_out + max_out
         return self.sigmoid(out)
 class SpatialAttention(nn.Module):
-    def __init__(self, kernel_size=7):
+    def __init__(self, kernel_size=3):
         super(SpatialAttention, self).__init__()
 
         assert kernel_size in (3, 7), 'kernel size must be 3 or 7'
@@ -236,8 +236,8 @@ class match_block(nn.Module):
         # c_weight = self.ChannelGate(spt)
         # x1 = qry*c_weight + qry
         x = qry*c_weight
-        x0 = self.SpatialAttention(x)
-        x1 = x * x0
+        x0 = self.SpatialAttention(spt)
+        x1 = x * x0 + qry
         x2 = spt
         return x2, x1
 
