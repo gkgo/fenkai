@@ -6,10 +6,43 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-
 class Flatten(nn.Module):
     def forward(self, x):
         return x.view(x.size(0), -1)
+
+
+class ChannelAttention(nn.Module):
+    def __init__(self, in_planes=640, ratio=10):
+        super(ChannelAttention, self).__init__()
+        # 利用1x1卷积代替全连接
+        self.fc1 = nn.Conv2d(in_planes, in_planes // ratio, 1, bias=False)
+        self.relu1 = nn.ReLU()
+        self.fc2 = nn.Conv2d(in_planes // ratio, in_planes, 1, bias=False)
+
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        avg_pool = F.avg_pool2d(x, (x.size(2), x.size(3)), stride=(x.size(2), x.size(3)))
+        avg_out = self.fc2(self.relu1(self.fc1(avg_pool)))
+        max_pool = F.max_pool2d(x, (x.size(2), x.size(3)), stride=(x.size(2), x.size(3)))
+        max_out = self.fc2(self.relu1(self.fc1(max_pool)))
+        out = avg_out + max_out
+        return self.sigmoid(out)
+class SpatialAttention(nn.Module):
+    def __init__(self, kernel_size=7):
+        super(SpatialAttention, self).__init__()
+
+        assert kernel_size in (3, 7), 'kernel size must be 3 or 7'
+        padding = 3 if kernel_size == 7 else 1
+        self.conv1 = nn.Conv2d(2, 1, kernel_size, padding=padding, bias=False)
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        avg_out = torch.mean(x, dim=1, keepdim=True)  # 80,1,5,5
+        max_out, _ = torch.max(x, dim=1, keepdim=True)  # 80,1,5,5
+        x = torch.cat([avg_out, max_out], dim=1)
+        x = self.conv1(x)  # 80,1,5,5
+        return self.sigmoid(x)
 
 
 class ChannelGate(nn.Module):
@@ -22,27 +55,25 @@ class ChannelGate(nn.Module):
             nn.ReLU(),
             nn.Linear(gate_channels // reduction_ratio, gate_channels)
         )
+
         self.pool_types = pool_types
 
     def forward(self, x):
         channel_att_sum = None
         for pool_type in self.pool_types:
             if pool_type == 'avg':
-                avg_pool = F.avg_pool2d(x, (x.size(2), x.size(3)), stride=(x.size(2), x.size(3)))
-                channel_att_raw = self.mlp(avg_pool)
+                avg_pool = F.avg_pool2d(x, (x.size(2), x.size(3)), stride=(x.size(2), x.size(3)))  # 50，640，1，1
+                channel_att_raw = self.mlp(avg_pool)  # 50，640
             elif pool_type == 'max':
-                max_pool = F.max_pool2d(x, (x.size(2), x.size(3)), stride=(x.size(2), x.size(3)))
+                max_pool = F.max_pool2d(x, (x.size(2), x.size(3)), stride=(x.size(2), x.size(3)))  # 50，640，1，1
                 channel_att_raw = self.mlp(max_pool)
-            elif pool_type == 'lp':
-                lp_pool = F.lp_pool2d(x, 2, (x.size(2), x.size(3)), stride=(x.size(2), x.size(3)))
-                channel_att_raw = self.mlp(lp_pool)
 
             if channel_att_sum is None:
                 channel_att_sum = channel_att_raw
             else:
                 channel_att_sum = channel_att_sum + channel_att_raw
 
-        scale = torch.sigmoid(channel_att_sum).unsqueeze(2).unsqueeze(3)
+        scale = torch.sigmoid(channel_att_sum).unsqueeze(2).unsqueeze(3)  # 50，640，1，1
         return scale
 
 class match_block1(nn.Module):
@@ -89,13 +120,18 @@ class match_block1(nn.Module):
         )
 
         self.ChannelGate = ChannelGate(self.in_channels)
+        self.ChannelAttention = ChannelAttention(self.in_channels)
+        self.SpatialAttention = SpatialAttention()
         self.globalAvgPool = nn.AdaptiveAvgPool2d(1)
 
     def forward(self, spt, qry):
-        c_weight = self.ChannelGate(spt)
-        x1 = spt*c_weight 
-        x = x1 + qry
-        return x
+        c_weight = self.ChannelAttention(spt)
+        # c_weight = self.ChannelGate(spt)
+        # x1 = qry*c_weight + qry
+        x = spt * c_weight
+        x0 = self.SpatialAttention(x)
+        x1 = x * x0 + qry
+        return x1
 
 class match_block(nn.Module):
     def __init__(self, inplanes):
@@ -141,6 +177,8 @@ class match_block(nn.Module):
         )
 
         self.ChannelGate = ChannelGate(self.in_channels)
+        self.ChannelAttention = ChannelAttention(self.in_channels)
+        self.SpatialAttention = SpatialAttention()
         self.globalAvgPool = nn.AdaptiveAvgPool2d(1)
 
     def forward(self, spt, qry):
@@ -190,16 +228,18 @@ class match_block(nn.Module):
         # act_det = non_det * c_weight   # 查询  (5,640,5,5)
         # # act_aim = act_aim.view(bs, -1, height_a * width_a)
         # # act_det = act_det.view(bq, -1, height_d * width_d)
-        # return act_det, act_aim
-        # x = (act_aim+act_det)/2
+        # return act_aim,act_det
+
+
+        #_______________________________________________________
+        c_weight = self.ChannelAttention(spt)
         # c_weight = self.ChannelGate(spt)
         # x1 = qry*c_weight + qry
-        # x2 = spt + qry
-        # x = (x1+x2)/2
-        c_weight = self.ChannelGate(spt)
-        x1 = qry*c_weight + qry
+        x = qry*c_weight
+        x0 = self.SpatialAttention(x)
+        x1 = x * x0
         x2 = spt
-        return x1,x2
+        return x2, x1
 
 class CCA(torch.nn.Module):
     def __init__(self, kernel_sizes=[3, 3], planes=[16, 1]):
