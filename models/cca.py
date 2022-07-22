@@ -20,6 +20,7 @@ class ChannelAttention(nn.Module):
         self.fc2 = nn.Conv2d(in_planes // ratio, in_planes, 1, bias=False)
 
         self.sigmoid = nn.Sigmoid()
+        self.relu = nn.ReLU(inplace=True)
 
     def forward(self, x):
         avg_pool = F.avg_pool2d(x, (x.size(2), x.size(3)), stride=(x.size(2), x.size(3)))
@@ -27,7 +28,7 @@ class ChannelAttention(nn.Module):
         max_pool = F.max_pool2d(x, (x.size(2), x.size(3)), stride=(x.size(2), x.size(3)))
         max_out = self.fc2(self.relu1(self.fc1(max_pool)))
         out = avg_out + max_out
-        return self.sigmoid(out)
+        return self.relu(out)
 class SpatialAttention(nn.Module):
     def __init__(self, kernel_size=3):
         super(SpatialAttention, self).__init__()
@@ -36,17 +37,17 @@ class SpatialAttention(nn.Module):
         padding = 3 if kernel_size == 7 else 1
         self.conv1 = nn.Conv2d(2, 1, kernel_size, padding=padding, bias=False)
         self.sigmoid = nn.Sigmoid()
-
+        self.relu = nn.ReLU(inplace=True)
     def forward(self, x):
         avg_out = torch.mean(x, dim=1, keepdim=True)  # 80,1,5,5
         max_out, _ = torch.max(x, dim=1, keepdim=True)  # 80,1,5,5
         x = torch.cat([avg_out, max_out], dim=1)
         x = self.conv1(x)  # 80,1,5,5
-        return self.sigmoid(x)
+        return self.relu(x)
 
 
 class ChannelGate(nn.Module):
-    def __init__(self, gate_channels, reduction_ratio=16, pool_types=['avg', 'max']):
+    def __init__(self, gate_channels, reduction_ratio=10, pool_types=['avg', 'max']):
         super(ChannelGate, self).__init__()
         self.gate_channels = gate_channels
         self.mlp = nn.Sequential(
@@ -57,7 +58,7 @@ class ChannelGate(nn.Module):
         )
 
         self.pool_types = pool_types
-
+        self.relu = nn.ReLU(inplace=True)
     def forward(self, x):
         channel_att_sum = None
         for pool_type in self.pool_types:
@@ -73,7 +74,7 @@ class ChannelGate(nn.Module):
             else:
                 channel_att_sum = channel_att_sum + channel_att_raw
 
-        scale = torch.sigmoid(channel_att_sum).unsqueeze(2).unsqueeze(3)  # 50，640，1，1
+        scale = self.relu(channel_att_sum).unsqueeze(2).unsqueeze(3)  # 50，640，1，1
         return scale
 
 class match_block1(nn.Module):
@@ -125,9 +126,9 @@ class match_block1(nn.Module):
         self.globalAvgPool = nn.AdaptiveAvgPool2d(1)
 
     def forward(self, spt, qry):
-        c_weight = self.ChannelAttention(spt)
         # c_weight = self.ChannelGate(spt)
         # x1 = qry*c_weight + qry
+        c_weight = self.ChannelAttention(spt)
         x = spt * c_weight
         x0 = self.SpatialAttention(x)
         x1 = x * x0 + qry
