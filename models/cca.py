@@ -28,7 +28,7 @@ class ChannelAttention(nn.Module):
         max_pool = F.max_pool2d(x, (x.size(2), x.size(3)), stride=(x.size(2), x.size(3)))
         max_out = self.fc2(self.relu1(self.fc1(max_pool)))
         out = avg_out + max_out
-        return self.sigmoid(out)
+        return self.relu(out)
 class SpatialAttention(nn.Module):
     def __init__(self, kernel_size=3):
         super(SpatialAttention, self).__init__()
@@ -43,7 +43,7 @@ class SpatialAttention(nn.Module):
         max_out, _ = torch.max(x, dim=1, keepdim=True)  # 80,1,5,5
         x = torch.cat([avg_out, max_out], dim=1)
         x = self.conv1(x)  # 80,1,5,5
-        return self.sigmoid(x)
+        return self.relu(x)
 
 
 class ChannelGate(nn.Module):
