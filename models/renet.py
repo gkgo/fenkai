@@ -2,11 +2,12 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-
 from models.resnet import ResNet
 from models.cca import *
-from models.scr import  *
+from models.scr import *
 import numpy as np
+
+
 # from models.others.se import SqueezeExcitation
 # from models.others.lsa import LocalSelfAttention
 # from models.others.nlsa import NonLocalSelfAttention
@@ -30,6 +31,7 @@ class RENet(nn.Module):
         self.scr_module = self._make_scr_layer(planes=[640, 64, 64, 64, 640])
         self.match_net = match_block(640)
         self.match_net1 = match_block1(640)
+        self.match_net2 = match_block2(640)
         self.cca_module = CCA(kernel_sizes=[3, 3], planes=[16, 1])
         self.cca_1x1 = nn.Sequential(
             nn.Conv2d(self.encoder_dim, 64, kernel_size=1, bias=False),
@@ -37,14 +39,12 @@ class RENet(nn.Module):
             nn.ReLU()
         )
 
-
-
     def _make_scr_layer(self, planes):
         stride, kernel_size, padding = (1, 1, 1), (5, 5), 2
         layers = list()
 
         if self.args.self_method == 'scr':
-            # corr_block1 = SelfCorrelationComputation1(d_model=640, h=1)
+            # corr_block2 = SelfCorrelationComputation1(d_model=640, h=1)
             # corr_block = SelfCorrelationComputation(kernel_size=kernel_size, padding=padding)
             # self_block = SCR(planes=planes, stride=stride)
             # corr_block2 = SelfCorrelationComputation6(in_planes=640, out_planes=640)
@@ -93,52 +93,50 @@ class RENet(nn.Module):
         qry = self.normalize_feature(qry)
         # spt, qry = self.match_net(spt, qry)
 
+        # corr4d = self.get_4d_correlation_map(spt, qry)  # 10，5，5，5，5，5
+        # num_qry, way, H_s, W_s, H_q, W_q = corr4d.size()
 
-        corr4d = self.get_4d_correlation_map(spt, qry)  # 10，5，5，5，5，5
-        num_qry, way, H_s, W_s, H_q, W_q = corr4d.size()
+        # # corr4d refinement
+        # # corr4d = self.cca_module(corr4d.view(-1, 1, H_s, W_s, H_q, W_q))
+        # corr4d_s = corr4d.view(num_qry, way, H_s * W_s, H_q, W_q)  # 10，5，25，5，5
+        # corr4d_q = corr4d.view(num_qry, way, H_s, W_s, H_q * W_q)  # 10，5，5，5，25
 
-        # corr4d refinement
-        # corr4d = self.cca_module(corr4d.view(-1, 1, H_s, W_s, H_q, W_q))
-        corr4d_s = corr4d.view(num_qry, way, H_s * W_s, H_q, W_q)  # 10，5，25，5，5
-        corr4d_q = corr4d.view(num_qry, way, H_s, W_s, H_q * W_q)  # 10，5，5，5，25
+        # # normalizing the entities for each side to be zero-mean and unit-variance to stabilize training
+        # corr4d_s = self.gaussian_normalize(corr4d_s, dim=2)
+        # corr4d_q = self.gaussian_normalize(corr4d_q, dim=4)
 
-        # normalizing the entities for each side to be zero-mean and unit-variance to stabilize training
-        corr4d_s = self.gaussian_normalize(corr4d_s, dim=2)
-        corr4d_q = self.gaussian_normalize(corr4d_q, dim=4)
+        # # applying softmax for each side
+        # corr4d_s = F.softmax(corr4d_s / self.args.temperature_attn, dim=2)
+        # corr4d_s = corr4d_s.view(num_qry, way, H_s, W_s, H_q, W_q)  # 10，5，5，5，5，5
+        # corr4d_q = F.softmax(corr4d_q / self.args.temperature_attn, dim=4)
+        # corr4d_q = corr4d_q.view(num_qry, way, H_s, W_s, H_q, W_q)  # 10，5，5，5，5，5
 
-        # applying softmax for each side
-        corr4d_s = F.softmax(corr4d_s / self.args.temperature_attn, dim=2)
-        corr4d_s = corr4d_s.view(num_qry, way, H_s, W_s, H_q, W_q)  # 10，5，5，5，5，5
-        corr4d_q = F.softmax(corr4d_q / self.args.temperature_attn, dim=4)
-        corr4d_q = corr4d_q.view(num_qry, way, H_s, W_s, H_q, W_q)  # 10，5，5，5，5，5
+        # # suming up matching scores
+        # attn_s = corr4d_s.sum(dim=[4, 5])  # 10，5，5，5
+        # attn_q = corr4d_q.sum(dim=[2, 3])  # 10，5，5，5
 
-        # suming up matching scores
-        attn_s = corr4d_s.sum(dim=[4, 5])  # 10，5，5，5
-        attn_q = corr4d_q.sum(dim=[2, 3])  # 10，5，5，5
+        # # applying attention
+        # spt_attended = attn_s.unsqueeze(2) * spt.unsqueeze(0)  # 10，5，640，5，5
+        # spt_attended = spt_attended.view(-1,640,H_s, W_s)
+        # qry_attended = attn_q.unsqueeze(2) * qry.unsqueeze(1)  # 10，5，640，5，5
+        # qry_attended = qry_attended.view(-1,640,H_q, W_q)
+        # spt_attended, qry_attended = self.match_net(spt_attended, qry_attended )
+        # spt_attended = spt_attended.view(num_qry, way,640,H_s, W_s)
+        # qry_attended = qry_attended.view(num_qry, way,640,H_q, W_q)
 
-        # applying attention
-        spt_attended = attn_s.unsqueeze(2) * spt.unsqueeze(0)  # 10，5，640，5，5
-        spt_attended = spt_attended.view(-1,640,H_s, W_s)
-        qry_attended = attn_q.unsqueeze(2) * qry.unsqueeze(1)  # 10，5，640，5，5
-        qry_attended = qry_attended.view(-1,640,H_q, W_q)
-        spt_attended, qry_attended = self.match_net(spt_attended, qry_attended )
-        spt_attended = spt_attended.view(num_qry, way,640,H_s, W_s)
-        qry_attended = qry_attended.view(num_qry, way,640,H_q, W_q)
+        # # averaging embeddings for k > 1 shots
+        # if self.args.shot > 1:
+        #     spt_attended = spt_attended.view(num_qry, self.args.shot, self.args.way, *spt_attended.shape[2:])
+        #     qry_attended = qry_attended.view(num_qry, self.args.shot, self.args.way, *qry_attended.shape[2:])
+        #     spt_attended = spt_attended.mean(dim=1)
+        #     qry_attended = qry_attended.mean(dim=1)
 
-        # averaging embeddings for k > 1 shots
-        if self.args.shot > 1:
-            spt_attended = spt_attended.view(num_qry, self.args.shot, self.args.way, *spt_attended.shape[2:])
-            qry_attended = qry_attended.view(num_qry, self.args.shot, self.args.way, *qry_attended.shape[2:])
-            spt_attended = spt_attended.mean(dim=1)
-            qry_attended = qry_attended.mean(dim=1)
-
-        # In the main paper, we present averaging in Eq.(4) and summation in Eq.(5).
-        # In the implementation, the order is reversed, however, those two ways become eventually the same anyway :)
-        spt_attended_pooled = spt_attended.mean(dim=[-1, -2])
-        qry_attended_pooled = qry_attended.mean(dim=[-1, -2])
-        qry_pooled = qry.mean(dim=[-1, -2])
-        similarity_matrix = F.cosine_similarity(spt_attended_pooled, qry_attended_pooled, dim=-1)
-
+        # # In the main paper, we present averaging in Eq.(4) and summation in Eq.(5).
+        # # In the implementation, the order is reversed, however, those two ways become eventually the same anyway :)
+        # spt_attended_pooled = spt_attended.mean(dim=[-1, -2])
+        # qry_attended_pooled = qry_attended.mean(dim=[-1, -2])
+        # qry_pooled = qry.mean(dim=[-1, -2])
+        # similarity_matrix = F.cosine_similarity(spt_attended_pooled, qry_attended_pooled, dim=-1)
 
         # for x,y in zip(batch1,batch2):
         #     act_det = x
@@ -152,31 +150,33 @@ class RENet(nn.Module):
         #     similarity_matrix = F.cosine_similarity(act_aim, act_det, dim=1)
         #     cos1.append(similarity_matrix)
         # similarity_matrix1 = torch.cat((cos1), dim=0)
-        #------------------------------------------------------------------------------------
+        # ------------------------------------------------------------------------------------
 
-        # batch1 = []  # 查询
-        # batch2 = []  # 支持
-        # cos = []
-        # if self.args.shot > 1:
-        #     qry_1, qry_2, qry_3 = torch.chunk(qry, 3, dim=0)
-        #     ch = [qry_1, qry_2, qry_3]
-        #     for d in zip(ch):
-        #         cx = d
-        #         cx = torch.tensor(np.array([item.cpu().detach().numpy() for item in cx])).cuda()
-        #         cx = cx.squeeze(0)
-        #         act_det, act_aim = self.match_net(spt, cx)
-        #         batch1.append(act_det)
-        #         batch2.append(act_aim)
-        # else:
-        #     qry_1, qry_2,qry_3, qry_4,qry_5, qry_6,qry_7, qry_8,qry_9, qry_10,qry_11, qry_12 ,qry_13, qry_14,qry_15= torch.chunk(qry, 15, dim=0)
-        #     ch = [qry_1, qry_2,qry_3, qry_4,qry_5, qry_6,qry_7, qry_8,qry_9, qry_10,qry_11, qry_12 ,qry_13, qry_14,qry_15]
-        #     for d in zip(ch):
-        #         cx = d
-        #         cx = torch.tensor(np.array([item.cpu().detach().numpy() for item in cx])).cuda()
-        #         cx = cx.squeeze(0)
-        #         act_det, act_aim = self.match_net(spt, cx)
-        #         batch1.append(act_det)
-        #         batch2.append(act_aim)
+        batch1 = []  # 查询
+        batch2 = []  # 支持
+        cos = []
+        if self.args.shot > 1:
+            qry_1, qry_2, qry_3 = torch.chunk(qry, 3, dim=0)
+            ch = [qry_1, qry_2, qry_3]
+            for d in zip(ch):
+                cx = d
+                cx = torch.tensor(np.array([item.cpu().detach().numpy() for item in cx])).cuda()
+                cx = cx.squeeze(0)
+                act_det, act_aim = self.match_net2(spt, cx)
+                batch1.append(act_det)
+                batch2.append(act_aim)
+        else:
+            qry_1, qry_2, qry_3, qry_4, qry_5, qry_6, qry_7, qry_8, qry_9, qry_10, qry_11, qry_12, qry_13, qry_14, qry_15 = torch.chunk(
+                qry, 15, dim=0)
+            ch = [qry_1, qry_2, qry_3, qry_4, qry_5, qry_6, qry_7, qry_8, qry_9, qry_10, qry_11, qry_12, qry_13, qry_14,
+                  qry_15]
+            for d in zip(ch):
+                cx = d
+                cx = torch.tensor(np.array([item.cpu().detach().numpy() for item in cx])).cuda()
+                cx = cx.squeeze(0)
+                act_det, act_aim = self.match_net2(spt, cx)
+                batch1.append(act_det)
+                batch2.append(act_aim)
 
         # batch1 = []  # 查询
         # batch2 = []  # 支持
@@ -191,8 +191,6 @@ class RENet(nn.Module):
         #     batch1.append(act_det)
         #     batch2.append(act_aim)
 
-
-
         # act_det = self.lin(act_det)
         # act_aim = self.lin(act_aim)
         #
@@ -203,69 +201,73 @@ class RENet(nn.Module):
         # else:
         #     return similarity_matrix / self.args.temperature
 
-# -----------------------------------------------------------------------
-
+        # -----------------------------------------------------------------------
 
         # (S * C * Hs * Ws, Q * C * Hq * Wq) -> Q * S * Hs * Ws * Hq * Wq
-        # for x,y,i in zip(batch1,batch2,ch):  # 查询 支持
-        #     act_det = x
-        #     act_aim = y
-        #     QR = i
-        #     QR = torch.tensor(np.array([item.cpu().detach().numpy() for item in QR])).cuda()
-        #     QR = QR.squeeze(0)
-        #     corr4d = self.get_4d_correlation_map(act_aim,  act_det)
-        #     num_qry, way, H_s, W_s, H_q, W_q = corr4d.size()
-        #
-        #     # corr4d refinement
-        #     corr4d = self.cca_module(corr4d.view(-1, 1, H_s, W_s, H_q, W_q))  # （375，1，5，5，5，5）（用4维卷积细化）
-        #     corr4d_s = corr4d.view(num_qry, way, H_s * W_s, H_q, W_q)  # （75，5，25，5，5）
-        #     corr4d_q = corr4d.view(num_qry, way, H_s, W_s, H_q * W_q)  # （75，5，5，5，25）
-        #
-        #     # normalizing the entities for each side to be zero-mean and unit-variance to stabilize training
-        #     corr4d_s = self.gaussian_normalize(corr4d_s, dim=2)  # H_q * W_q可以看作一个特征向量  # (5,5,25,5,5)
-        #     corr4d_q = self.gaussian_normalize(corr4d_q, dim=4)  # 把H_q * W_q进行高斯归一化
-        #
-        #     # applying softmax for each side
-        #     corr4d_s = F.softmax(corr4d_s / self.args.temperature_attn, dim=2)  # Eq.4（上面）（大小不变）# (5,5,25,5,5)
-        #     corr4d_s = corr4d_s.view(num_qry, way, H_s, W_s, H_q, W_q)
-        #     corr4d_q = F.softmax(corr4d_q / self.args.temperature_attn, dim=4)
-        #     corr4d_q = corr4d_q.view(num_qry, way, H_s, W_s, H_q, W_q)
-        #
-        #     # suming up matching scores
-        #     attn_s = corr4d_s.sum(dim=[4, 5])  # 最后2维 相当于最大池化
-        #     attn_q = corr4d_q.sum(dim=[2, 3])  # 中间2维
-        #     # 先求和（5，5，5，5）
-        #     # applying attention
-        #     spt_attended = attn_s.unsqueeze(2) * spt.unsqueeze(0)  # 公式5求最终的query embedding
-        #     qry_attended = attn_q.unsqueeze(2) * QR.unsqueeze(1)
-        #     # （5，5，640，5，5）
-        #     # averaging embeddings for k > 1 shots
-        #     if self.args.shot > 1:
-        #         spt_attended = spt_attended.view(num_qry, self.args.shot, self.args.way, *spt_attended.shape[2:])
-        #         qry_attended = qry_attended.view(num_qry, self.args.shot, self.args.way, *qry_attended.shape[2:])
-        #         spt_attended = spt_attended.mean(dim=1)
-        #         qry_attended = qry_attended.mean(dim=1)
-        #
-        #     # In the main paper, we present averaging in Eq.(4) and summation in Eq.(5).
-        #     # In the implementation, the order is reversed, however, those two ways become eventually the same anyway :)
-        #     spt_attended_pooled = spt_attended.mean(dim=[-1, -2])
-        #     qry_attended_pooled = qry_attended.mean(dim=[-1, -2])
-        #
-        #
-        #     similarity_matrix = F.cosine_similarity(spt_attended_pooled, qry_attended_pooled, dim=-1)  # 公式3（75，5）
-        #     # 求余弦相似度，跟论文顺序不一样
-        #     cos.append(similarity_matrix)
-        #
-        # similarity_matrix = torch.cat((cos),dim=0)
-        # # 再平均（对应公式4里的1/h*w）（75，5，640）
-        # qry_pooled = qry.mean(dim=[-1, -2])
+        for x, y, i in zip(batch1, batch2, ch):  # 查询 支持
+            act_det = x
+            act_aim = y
+            QR = i
+            QR = torch.tensor(np.array([item.cpu().detach().numpy() for item in QR])).cuda()
+            QR = QR.squeeze(0)
+            corr4d = self.get_4d_correlation_map(act_aim, act_det)
+            num_qry, way, H_s, W_s, H_q, W_q = corr4d.size()
+
+            # corr4d refinement
+            corr4d = self.cca_module(corr4d.view(-1, 1, H_s, W_s, H_q, W_q))  # （375，1，5，5，5，5）（用4维卷积细化）
+            corr4d_s = corr4d.view(num_qry, way, H_s * W_s, H_q, W_q)  # （75，5，25，5，5）
+            corr4d_q = corr4d.view(num_qry, way, H_s, W_s, H_q * W_q)  # （75，5，5，5，25）
+
+            # normalizing the entities for each side to be zero-mean and unit-variance to stabilize training
+            corr4d_s = self.gaussian_normalize(corr4d_s, dim=2)  # H_q * W_q可以看作一个特征向量  # (5,5,25,5,5)
+            corr4d_q = self.gaussian_normalize(corr4d_q, dim=4)  # 把H_q * W_q进行高斯归一化
+
+            # applying softmax for each side
+            corr4d_s = F.softmax(corr4d_s / self.args.temperature_attn, dim=2)  # Eq.4（上面）（大小不变）# (5,5,25,5,5)
+            corr4d_s = corr4d_s.view(num_qry, way, H_s, W_s, H_q, W_q)
+            corr4d_q = F.softmax(corr4d_q / self.args.temperature_attn, dim=4)
+            corr4d_q = corr4d_q.view(num_qry, way, H_s, W_s, H_q, W_q)
+
+            # suming up matching scores
+            attn_s = corr4d_s.sum(dim=[4, 5])  # 最后2维 相当于最大池化
+            attn_q = corr4d_q.sum(dim=[2, 3])  # 中间2维
+            # 先求和（5，5，5，5）
+            # applying attention
+            spt_attended = attn_s.unsqueeze(2) * spt.unsqueeze(0)  # 10，5，640，5，5
+            spt_attended = spt_attended.view(-1, 640, H_s, W_s)
+            qry_attended = attn_q.unsqueeze(2) * QR.unsqueeze(1)  # 10，5，640，5，5
+            qry_attended = qry_attended.view(-1, 640, H_q, W_q)
+            spt_attended, qry_attended = self.match_net(spt_attended, qry_attended)
+            spt_attended = spt_attended.view(num_qry, way, 640, H_s, W_s)
+            qry_attended = qry_attended.view(num_qry, way, 640, H_q, W_q)
+            # spt_attended = attn_s.unsqueeze(2) * spt.unsqueeze(0)  # 公式5求最终的query embedding
+            # qry_attended = attn_q.unsqueeze(2) * QR.unsqueeze(1)
+            # （5，5，640，5，5）
+            # averaging embeddings for k > 1 shots
+            if self.args.shot > 1:
+                spt_attended = spt_attended.view(num_qry, self.args.shot, self.args.way, *spt_attended.shape[2:])
+                qry_attended = qry_attended.view(num_qry, self.args.shot, self.args.way, *qry_attended.shape[2:])
+                spt_attended = spt_attended.mean(dim=1)
+                qry_attended = qry_attended.mean(dim=1)
+
+            # In the main paper, we present averaging in Eq.(4) and summation in Eq.(5).
+            # In the implementation, the order is reversed, however, those two ways become eventually the same anyway :)
+            spt_attended_pooled = spt_attended.mean(dim=[-1, -2])
+            qry_attended_pooled = qry_attended.mean(dim=[-1, -2])
+
+            similarity_matrix = F.cosine_similarity(spt_attended_pooled, qry_attended_pooled, dim=-1)  # 公式3（75，5）
+            # 求余弦相似度，跟论文顺序不一样
+            cos.append(similarity_matrix)
+
+        similarity_matrix = torch.cat((cos), dim=0)
+        # 再平均（对应公式4里的1/h*w）（75，5，640）
+        qry_pooled = qry.mean(dim=[-1, -2])
         if self.training:
             return similarity_matrix / self.args.temperature, self.fc(qry_pooled)
         else:
             return similarity_matrix / self.args.temperature
 
-
-# ----------------------------------------------------------------------------------
+    # ----------------------------------------------------------------------------------
     def gaussian_normalize(self, x, dim, eps=1e-05):
         x_mean = torch.mean(x, dim=dim, keepdim=True)
         x_var = torch.var(x, dim=dim, keepdim=True)  # 求dim上的方差
@@ -310,7 +312,7 @@ class RENet(nn.Module):
         if self.args.self_method:
             identity = x  # (80,640,5,5)
             x = self.scr_module(x)
-            # x = self.match_net1(x,identity)
+            # x = self.match_net1(x, identity)
 
             if self.args.self_method == 'scr':
                 x = x + identity   # 公式（2）
