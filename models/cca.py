@@ -28,7 +28,7 @@ class ChannelAttention(nn.Module):
         max_pool = F.max_pool2d(x, (x.size(2), x.size(3)), stride=(x.size(2), x.size(3)))
         max_out = self.fc2(self.relu1(self.fc1(max_pool)))
         out = avg_out + max_out
-        return self.relu(out)
+        return self.sigmoid(out)
 class SpatialAttention(nn.Module):
     def __init__(self, kernel_size=3):
         super(SpatialAttention, self).__init__()
@@ -43,7 +43,7 @@ class SpatialAttention(nn.Module):
         max_out, _ = torch.max(x, dim=1, keepdim=True)  # 80,1,5,5
         x = torch.cat([avg_out, max_out], dim=1)
         x = self.conv1(x)  # 80,1,5,5
-        return self.relu(x)
+        return self.sigmoid(x)
 
 
 class ChannelGate(nn.Module):
@@ -183,63 +183,16 @@ class match_block(nn.Module):
         self.globalAvgPool = nn.AdaptiveAvgPool2d(1)
 
     def forward(self, spt, qry):
-
-        # bs, cs, height_a, width_a = spt.shape  # 支持集
-        # bq, cq, height_d, width_d = qry.shape  # 查询集
-        # d_x = self.g(qry).view(bq, self.inter_channels, -1)  # i 10(5,320,25)
-        # d_x = d_x.permute(0, 2, 1).contiguous()  # b,h*w,c           # 10(5,25,320)
-        #
-        #
-        # a_x = self.g(spt).view(bs, self.inter_channels, -1)
-        # a_x = a_x.permute(0, 2, 1).contiguous()  # x b,h*w,c           # (5,25,320)
-        #
-        #
-        #
-        # theta_x = self.theta(spt).view(bs, self.inter_channels, -1)
-        # theta_x = theta_x.permute(0, 2, 1)  # aim b,h*w,c # (5,25,320)
-        #
-        # phi_x = self.phi(qry).view(bq, self.inter_channels, -1)  # dect b,c,h*w # 10(5,25,320)
-        #
-        # f = torch.matmul(theta_x, phi_x)  # (5,25,25)
-        # # f = torch.einsum('svc,qmc->sqvm', theta_x, phi_x)  # 5,10,25,25
-        #
-        # N = f.size(-1)  # (25)
-        # f_div_C = f / N  # 10(5,25,25)
-        #
-        # f = f.permute(0,2,1).contiguous()
-        # N = f.size(-1)  # (25)
-        # fi_div_C = f / N  # (5,25,25)
-        #
-        # non_aim = torch.matmul(f_div_C, d_x)  # (5,25,25) (5,25,320) (10,5,25,320)
-        # # non_aim = torch.einsum('sqvm,qmc->sqvm', theta_x, phi_x)
-        # non_aim = non_aim.permute(0,2,1).contiguous()
-        # non_aim = non_aim.view(bs, self.inter_channels, height_a, width_a)  # (5,320,5,5)
-        # non_aim = self.W(non_aim)
-        #
-        # non_det = torch.matmul(fi_div_C, a_x)
-        # non_det = non_det.permute(0,2,1).contiguous()
-        # non_det = non_det.view(bq, self.inter_channels, height_d, width_d)
-        # non_det = self.Q(non_det)
-        #
-        #
-        # #################################### Response in chaneel weight ####################################################
-        #
-        # c_weight = self.ChannelGate(non_aim)  # (5,640,1,1)
-        # act_aim = non_aim * c_weight  # 支持  (5,640,5,5)
-        # act_det = non_det * c_weight   # 查询  (5,640,5,5)
-        # # act_aim = act_aim.view(bs, -1, height_a * width_a)
-        # # act_det = act_det.view(bq, -1, height_d * width_d)
-        # return act_aim,act_det
-
-
-        #_______________________________________________________
-        c_weight = self.ChannelAttention(spt)
+        c_weight1 = self.ChannelAttention(spt)
+        c_weight2 = self.ChannelAttention(qry)
         # c_weight = self.ChannelGate(spt)
         # x1 = qry*c_weight + qry
-        x = qry*c_weight
-        x0 = self.SpatialAttention(spt)
-        x1 = x * x0 + qry
-        x2 = spt
+        xq = qry*c_weight1
+        xs = spt*c_weight2
+        xq0 = self.SpatialAttention(spt)
+        xs0 = self.SpatialAttention(qry)
+        x1 = xq * xq0 + qry
+        x2 = xs * xs0 + spt
         return x2, x1
 
 class CCA(torch.nn.Module):
