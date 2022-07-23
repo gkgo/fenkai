@@ -168,8 +168,8 @@ class match_block(nn.Module):
         xs = spt*c_weight2
         xq0 = self.SpatialAttention(spt)
         xs0 = self.SpatialAttention(qry)
-        x1 = xq * xq0 + qry
-        x2 = xs * xs0 + spt
+        x1 = xq * xq0 
+        x2 = xs * xs0 
         return x2, x1
 
 class CCA(torch.nn.Module):
