@@ -74,7 +74,7 @@ class ChannelGate(nn.Module):
             else:
                 channel_att_sum = channel_att_sum + channel_att_raw
 
-        scale = self.relu(channel_att_sum).unsqueeze(2).unsqueeze(3)  # 50，640，1，1
+        scale = torch.sigmoid(channel_att_sum).unsqueeze(2).unsqueeze(3)  # 50，640，1，1
         return scale
 class match_block2(nn.Module):
     def __init__(self, inplanes):
